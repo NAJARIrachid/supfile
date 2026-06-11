@@ -1,0 +1,100 @@
+// Schéma Prisma SUPFile — métadonnées uniquement (fichiers sur disque/volume Docker)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+}
+
+model User {
+  id        String       @id @default(uuid())
+  email     String       @unique
+  password  String?      // null si connexion OAuth uniquement
+  avatar    String?
+  provider  AuthProvider @default(LOCAL)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  folders      Folder[]
+  files        File[]
+  folderShares FolderShare[] @relation("SharedWithUser")
+  ownedShares  FolderShare[] @relation("ShareOwner")
+}
+
+model Folder {
+  id        String   @id @default(uuid())
+  name      String
+  parentId  String?
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   Folder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Folder[] @relation("FolderTree")
+  owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  files    File[]
+  shares   FolderShare[]
+  shareLinks ShareLink[]
+
+  @@index([ownerId])
+  @@index([parentId])
+}
+
+model File {
+  id        String    @id @default(uuid())
+  name      String
+  path      String    // chemin relatif sous uploads/ (ex: userId/uuid.ext)
+  mimeType  String
+  size      BigInt
+  folderId  String?
+  ownerId   String
+  deletedAt DateTime? // corbeille logicielle
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  folder     Folder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  owner      User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  shareLinks ShareLink[]
+
+  @@index([ownerId])
+  @@index([folderId])
+  @@index([deletedAt])
+}
+
+model ShareLink {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  password  String?   // hash bcrypt optionnel pour lien protégé
+  expiresAt DateTime?
+  fileId    String?
+  folderId  String?
+  createdAt DateTime  @default(now())
+
+  file   File?   @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  folder Folder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+}
+
+model FolderShare {
+  id           String   @id @default(uuid())
+  folderId     String
+  ownerId      String
+  targetUserId String
+  createdAt    DateTime @default(now())
+
+  folder     Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  owner      User   @relation("ShareOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  targetUser User   @relation("SharedWithUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, targetUserId])
+  @@index([targetUserId])
+}

@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Environment & secrets
+.env
+.env.local
+*.env
+
+# Uploads (fichiers utilisateurs)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs & OS
+*.log
+.DS_Store
+
+# Prisma
+.prisma/
+
+# Fichiers de test locaux
+test.txt
+test-download.txt
